@@ -19,7 +19,7 @@ jobs:
 
       - uses: MilesChou/composer-action/7.3/install@master
         with:
-          args: install, dump-autoload
+          args: install
 
       - uses: php-actions/phpunit@v3
         with:
