@@ -30,7 +30,6 @@ jobs:
         run: docker-compose up -d
 
       - name: PHP Runner
-        uses: franzliedke/gh-action-php@0.2.0
         run: php vendor/phpunit/phpunit/phpunit ./tests
 
 
