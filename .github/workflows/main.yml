@@ -28,6 +28,11 @@ jobs:
       - name: Start containers
         working-directory: ./test_suite
         run: docker-compose up -d
+        
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '7.3'
 
       - name: PHP Runner
         run: php vendor/phpunit/phpunit/phpunit ./tests
