@@ -17,11 +17,11 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - uses: MilesChou/composer-action/7.3/install@master
+      - uses: MilesChou/composer-action/7.4/install@master
         with:
           args: install
 
-      - uses: MilesChou/composer-action/7.3/install@master
+      - uses: MilesChou/composer-action/7.4/install@master
         with:
           args: dump-autoload
 
@@ -32,9 +32,9 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '7.3'
+          php-version: '7.4'
 
       - name: PHP Runner
-        run: php vendor/phpunit/phpunit/phpunit ./tests
+        run: php vendor/phpunit/phpunit/phpunit ./tests/*
 
 
