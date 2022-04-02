@@ -11,10 +11,14 @@ use Siruis\Agent\Wallet\Abstracts\Ledger\NYMRole;
 class LedgerProxy extends AbstractLedger
 {
     /**
-     * @var AgentRPC
+     * @var \Siruis\Agent\Connections\AgentRPC
      */
     private $rpc;
 
+    /**
+     * LedgerProxy constructor.
+     * @param \Siruis\Agent\Connections\AgentRPC $rpc
+     */
     public function __construct(AgentRPC $rpc)
     {
         $this->rpc = $rpc;
@@ -54,7 +58,7 @@ class LedgerProxy extends AbstractLedger
     /**
      * @inheritDoc
      */
-    public function write_nym(string $pool_name, string $submitter_did, string $target_did, string $ver_key = null, string $alias = null, NYMRole $role = null): array
+    public function write_nym(string $pool_name, string $submitter_did, string $target_did, string $ver_key = null, string $alias = null, $role = null): array
     {
         return $this->rpc->remoteCall(
             'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/sirius_rpc/1.0/write_nym',

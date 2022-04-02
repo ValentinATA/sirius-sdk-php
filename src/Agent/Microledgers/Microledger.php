@@ -14,11 +14,18 @@ class Microledger extends AbstractMicroledger
     public $api;
     public $state;
 
-    public function __construct(string $name, AgentRPC $api)
+    public function __construct(string $name, AgentRPC $api, array $state = null)
     {
         $this->name = $name;
         $this->api = $api;
-        $this->state = null;
+        $this->state = $state;
+    }
+
+    public function assign_to(AbstractMicroledger $other): void
+    {
+        if ($other instanceof self) {
+            $other->state = $this->state;
+        }
     }
 
     public function getName(): string
@@ -32,7 +39,7 @@ class Microledger extends AbstractMicroledger
      */
     public function getSize(): int
     {
-        $this->__check_state_is_exists();
+        $this->check_state_is_exists();
         return $this->state['size'];
     }
 
@@ -42,7 +49,7 @@ class Microledger extends AbstractMicroledger
      */
     public function getUncommittedSize(): int
     {
-        $this->__check_state_is_exists();
+        $this->check_state_is_exists();
         return $this->state['uncommitted_size'];
     }
 
@@ -52,7 +59,7 @@ class Microledger extends AbstractMicroledger
      */
     public function getRootHash(): string
     {
-        $this->__check_state_is_exists();
+        $this->check_state_is_exists();
         return $this->state['root_hash'];
     }
 
@@ -62,7 +69,7 @@ class Microledger extends AbstractMicroledger
      */
     public function getUncommittedRootHash(): string
     {
-        $this->__check_state_is_exists();
+        $this->check_state_is_exists();
         return $this->state['uncommitted_root_hash'];
     }
 
@@ -72,11 +79,17 @@ class Microledger extends AbstractMicroledger
      */
     public function getSeqNo(): int
     {
-        $this->__check_state_is_exists();
+        $this->check_state_is_exists();
         return $this->state['seqNo'];
     }
 
-    public function reload()
+    /**
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
+     */
+    public function reload(): void
     {
         $state = $this->api->remoteCall(
             'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/microledgers/1.0/state',
@@ -87,53 +100,70 @@ class Microledger extends AbstractMicroledger
         $this->state = $state;
     }
 
-    public function rename(string $new_name)
+    /**
+     * @param string $new_name
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
+     */
+    public function rename(string $new_name): void
     {
-        return $this->api->remoteCall(
+        $this->api->remoteCall(
             'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/microledgers/1.0/rename',
             [
                 'name' => $this->name,
                 'new_name' => $new_name
             ]
         );
+        $this->name = $new_name;
     }
 
     /**
      * @param array $genesis
-     * @return mixed
-     * @throws SiriusContextError
+     * @return array
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusContextError
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
      */
-    public function init(array $genesis)
+    public function init(array $genesis): array
     {
-        $remoteCallResult = $this->api->remoteCall(
+        [$this->state, $txns] = $this->api->remoteCall(
             'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/microledgers/1.0/initialize',
             [
                 'name' => $this->name,
-                'new_name' => $genesis
+                'genesis_txns' => $genesis
             ]
         );
-        $this->state = $remoteCallResult[0];
-        $txns = $remoteCallResult[1];
+        $result = [];
         foreach ($txns as $txn) {
-            array_push($result, Transaction::from_value($txn));
+            $txn = Transaction::create($txn);
+            $result[] = $txn;
         }
-        return $txns;
+        return $result;
     }
 
     /**
      * @param array $transactions
-     * @param null $txn_time
+     * @param $txn_time
      * @return array
-     * @throws SiriusContextError
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusContextError
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
      */
     public function append(array $transactions, $txn_time = null): array
     {
         $transactions_to_append = [];
         foreach ($transactions as $txn) {
             if ($txn instanceof Transaction) {
-                array_push($transactions_to_append, $txn);
+                $transactions_to_append[] = $txn->as_object();
             } elseif (is_array($txn)) {
-                array_push($transactions_to_append, Transaction::create($txn));
+                $txn = Transaction::create($txn);
+                $transactions_to_append[] = $txn->as_object();
             } else {
                 throw new RuntimeException('Unexpected transaction type');
             }
@@ -141,45 +171,50 @@ class Microledger extends AbstractMicroledger
         $transactions_with_meta = $this->api->remoteCall(
             'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/microledgers/1.0/append_txns_metadata',
             [
-                'name' => $this->name,
+                'name' => $this->getName(),
                 'txns' => $transactions_to_append,
                 'txn_time' => $txn_time
             ]
         );
-        $resultArr = $this->api->remoteCall(
+        [$this->state, $start, $end, $appended_txns] = $this->api->remoteCall(
             'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/microledgers/1.0/append_txns',
             [
                 'name' => $this->name,
                 'txns' => $transactions_with_meta
             ]
         );
-        $this->state = $resultArr[0];
-        return [
-            $resultArr[1], $resultArr[2], Transaction::from_value($resultArr[3])
-        ];
+        return [$start, $end, $appended_txns];
     }
 
     /**
      * @param int $count
      * @return array
-     * @throws SiriusContextError
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
      */
-    public function commit(int $count)
+    public function commit(int $count): array
     {
-        $resultArr = $this->api->remoteCall(
+        [$this->state, $start, $end, $committed_txns] = $this->api->remoteCall(
             'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/microledgers/1.0/commit_txns',
             [
                 'name' => $this->name,
                 'count' => $count
             ]
         );
-        $this->state = $resultArr[0];
-        return [
-            $resultArr[1], $resultArr[2], Transaction::from_value($resultArr[3])
-        ];
+        return [$start, $end, $committed_txns];
     }
 
-    public function discard(int $count)
+    /**
+     * @param int $count
+     * @return void
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
+     */
+    public function discard(int $count): void
     {
         $this->state = $this->api->remoteCall(
             'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/microledgers/1.0/discard_txns',
@@ -190,6 +225,14 @@ class Microledger extends AbstractMicroledger
         );
     }
 
+    /**
+     * @param int $seq_no
+     * @return \Siruis\Agent\Microledgers\MerkleInfo
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
+     */
     public function merkle_info(int $seq_no): MerkleInfo
     {
         $merkle_info = $this->api->remoteCall(
@@ -205,6 +248,14 @@ class Microledger extends AbstractMicroledger
         );
     }
 
+    /**
+     * @param int $seq_no
+     * @return \Siruis\Agent\Microledgers\AuditProof
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
+     */
     public function audit_proof(int $seq_no): AuditProof
     {
         $proof = $this->api->remoteCall(
@@ -221,7 +272,14 @@ class Microledger extends AbstractMicroledger
         );
     }
 
-    public function reset_uncommitted()
+    /**
+     * @return void
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
+     */
+    public function reset_uncommitted(): void
     {
         $this->state = $this->api->remoteCall(
             'did:sov:BzCbsNYhMrjHiqZDTUASHg;spec/microledgers/1.0/reset_uncommitted',
@@ -233,8 +291,11 @@ class Microledger extends AbstractMicroledger
 
     /**
      * @param int $seq_no
-     * @return Transaction
-     * @throws SiriusContextError
+     * @return \Siruis\Agent\Microledgers\Transaction
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
      */
     public function get_transaction(int $seq_no): Transaction
     {
@@ -245,10 +306,17 @@ class Microledger extends AbstractMicroledger
                 'seqNo' => $seq_no
             ]
         );
-        $txn = Transaction::from_value($txn);
-        return $txn;
+        return new Transaction($txn);
     }
 
+    /**
+     * @param int $seq_no
+     * @return \Siruis\Agent\Microledgers\Transaction
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
+     */
     public function get_uncommitted_transaction(int $seq_no): Transaction
     {
         $txn = $this->api->remoteCall(
@@ -258,13 +326,15 @@ class Microledger extends AbstractMicroledger
                 'seqNo' => $seq_no
             ]
         );
-        $txn = Transaction::from_value($txn);
-        return $txn;
+        return new Transaction($txn);
     }
 
     /**
-     * @return Transaction
-     * @throws SiriusContextError
+     * @return \Siruis\Agent\Microledgers\Transaction
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
      */
     public function get_last_transaction(): Transaction
     {
@@ -274,13 +344,15 @@ class Microledger extends AbstractMicroledger
                 'name' => $this->name
             ]
         );
-        $txn = Transaction::from_value($txn);
-        return $txn;
+        return new Transaction($txn);
     }
 
     /**
-     * @return Transaction
-     * @throws SiriusContextError
+     * @return \Siruis\Agent\Microledgers\Transaction
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
      */
     public function get_last_committed_transaction(): Transaction
     {
@@ -290,13 +362,15 @@ class Microledger extends AbstractMicroledger
                 'name' => $this->name
             ]
         );
-        $txn = Transaction::from_value($txn);
-        return $txn;
+        return new Transaction($txn);
     }
 
     /**
      * @return array
-     * @throws SiriusContextError
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
      */
     public function get_all_transactions(): array
     {
@@ -308,11 +382,18 @@ class Microledger extends AbstractMicroledger
         );
         $ts = [];
         foreach ($txns as $t) {
-            array_push($ts, $t[1]);
+            $ts[] = new Transaction($t[1]);
         }
-        return Transaction::from_value($ts);
+        return $ts;
     }
 
+    /**
+     * @return array
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
+     */
     public function get_uncommitted_transactions(): array
     {
         $txns = $this->api->remoteCall(
@@ -321,16 +402,20 @@ class Microledger extends AbstractMicroledger
                 'name' => $this->name
             ]
         );
-        $txns = Transaction::from_value($txns);
-        return $txns;
+        $result = [];
+        foreach ($txns as $txn) {
+            $result[] = new Transaction($txn);
+        }
+        return $result;
     }
 
     /**
-     * @throws SiriusContextError
+     * @throws \Siruis\Errors\Exceptions\SiriusContextError
      */
-    public function __check_state_is_exists()
+    public function check_state_is_exists(): void
     {
-        if (!$this->state)
+        if (!$this->state) {
             throw new SiriusContextError('Load state of Microledger at First!');
+        }
     }
 }

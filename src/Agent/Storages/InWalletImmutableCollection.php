@@ -3,60 +3,92 @@
 
 namespace Siruis\Agent\Storages;
 
-
 use Siruis\Agent\Wallet\Abstracts\NonSecrets\AbstractNonSecrets;
 use Siruis\Agent\Wallet\Abstracts\NonSecrets\RetrieveRecordOptions;
 use Siruis\Storage\Abstracts\AbstractImmutableCollection;
 
 class InWalletImmutableCollection extends AbstractImmutableCollection
 {
-    const DEFAULT_FETCH_LIMIT = 1000;
+    public const DEFAULT_FETCH_LIMIT = 1000;
 
     /**
      * @var AbstractNonSecrets
      */
     public $storage;
-
+    /**
+     * @var string
+     */
     public $selected_db;
 
+    /**
+     * InWalletImmutableCollection constructor.
+     *
+     * @param AbstractNonSecrets $in_wallet_storage
+     * @return void
+     */
     public function __construct(AbstractNonSecrets $in_wallet_storage)
     {
         $this->storage = $in_wallet_storage;
-        $this->selected_db = null;
+        $this->selected_db = '';
     }
 
-    public function select_db(string $db_name)
+    /**
+     * @param string $db_name
+     * @return void
+     */
+    public function select_db(string $db_name): void
     {
         $this->selected_db = $db_name;
     }
 
-    public function add($value, array $tags)
+    /**
+     * @param $value
+     * @param array $tags
+     * @return void
+     * @throws \JsonException
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
+     */
+    public function add($value, array $tags): void
     {
-        $payload = json_decode($value);
-        $this->storage->add_wallet_record(
+        $payload = json_encode($value, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES);
+        $this->storage::add_wallet_record(
             $this->selected_db,
-            uniqid(),
+            uniqid('', true),
             $payload,
             $tags
         );
     }
 
+    /**
+     * @param array $tags
+     * @param int|null $limit
+     * @return array
+     * @throws \JsonException
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
+     */
     public function fetch(array $tags, int $limit = null): array
     {
-        $result = $this->storage->wallet_search(
+        [$collection, $total_count] = $this->storage::wallet_search(
             $this->selected_db,
             $tags,
-            new RetrieveRecordOptions(true),
-            $limit ? $limit : self::DEFAULT_FETCH_LIMIT
+            new RetrieveRecordOptions(false, true),
+            $limit ?: self::DEFAULT_FETCH_LIMIT
         );
-        if ($result[0]) {
+
+        if ($collection) {
             $values = [];
-            foreach ($result[0] as $item) {
-                array_push($values, json_encode($item['value']));
+            foreach ($collection as $item) {
+                $values[] = json_decode($item['value'], true, 512, JSON_THROW_ON_ERROR);
             }
-            return [$values, $result[1]];
-        } else {
-            return [[], $result[1]];
+            return [$values, $total_count];
         }
+
+        return [[], $total_count];
     }
 }

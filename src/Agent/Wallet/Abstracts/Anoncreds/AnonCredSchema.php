@@ -8,27 +8,34 @@ use Siruis\Errors\Exceptions\SiriusValidationError;
 
 class AnonCredSchema
 {
+    /**
+     * @var array|null
+     */
     public $body;
 
     /**
      * AnonCredSchema constructor.
      * @param array|null $args
-     * @throws SiriusValidationError
+     * @throws \Siruis\Errors\Exceptions\SiriusValidationError
      */
     public function __construct(array $args = null)
     {
         $this->body = array();
-        $fields = ['ver', 'id', 'name', 'version', 'attrNames'];
-        foreach ($fields as $field) {
-            if (key_exists($field, $args)) {
-                throw new SiriusValidationError('Except for '. $field . ' field exists');
+        if (!is_null($args)) {
+            $fields = ['ver', 'id', 'name', 'version', 'attrNames'];
+            foreach ($fields as $field) {
+                if (!array_key_exists($field, $args)) {
+                    throw new SiriusValidationError('Except for '. $field . ' field exists');
+                }
+                $this->body[$field] = $args[$field];
             }
-            $this->body[$field] = $args[$field];
         }
         $this->body = $args;
     }
 
     /**
+     * Get id attribute from the body.
+     *
      * @return string
      */
     public function getId(): string
@@ -37,6 +44,8 @@ class AnonCredSchema
     }
 
     /**
+     * Get attributes from the body.
+     *
      * @return array
      */
     public function getAttributes(): array
@@ -46,6 +55,8 @@ class AnonCredSchema
     }
 
     /**
+     * Get name attribute from the body.
+     *
      * @return string
      */
     public function getName(): string
@@ -54,6 +65,8 @@ class AnonCredSchema
     }
 
     /**
+     * Get version attribute from the body.
+     *
      * @return string
      */
     public function getVersion(): string

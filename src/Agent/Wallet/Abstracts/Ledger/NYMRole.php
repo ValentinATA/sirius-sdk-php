@@ -14,28 +14,51 @@ class NYMRole extends Enum
     public const NETWORK_MONITOR = [201, 'NETWORK_MONITOR'];
     public const RESET = [null, ''];
 
-    public function serialize()
+    /**
+     * Specify data which should be serialized to JSON. This method returns data that can be serialized by json_encode()
+     * natively.
+     *
+     * @return mixed
+     */
+    public function jsonSerialize()
     {
-        return $this->getValue();
+        [$_, $role_name] = $this->getValue();
+        return $role_name;
     }
 
-    public static function deserialize(string $buffer)
+    /**
+     * Deserialize from the given buffer.
+     *
+     * @param string $buffer
+     * @return array
+     */
+    public static function deserialize(string $buffer): array
     {
         $role_name = $buffer;
-        if ($role_name == 'null') {
+        if ($role_name === 'null') {
             return self::COMMON_USER;
-        } elseif ($role_name == 'TRUSTEE') {
-            return self::TRUSTEE;
-        } elseif ($role_name == 'STEWARD') {
-            return self::STEWARD;
-        } elseif ($role_name == 'TRUST_ANCHOR') {
-            return self::TRUST_ANCHOR;
-        } elseif ($role_name == 'NETWORK_MONITOR') {
-            return self::NETWORK_MONITOR;
-        } elseif ($role_name == '') {
-            return self::RESET;
-        } else {
-            throw new RuntimeException('Unexpected value ' . $buffer);
         }
+
+        if ($role_name === 'TRUSTEE') {
+            return self::TRUSTEE;
+        }
+
+        if ($role_name === 'STEWARD') {
+            return self::STEWARD;
+        }
+
+        if ($role_name === 'TRUST_ANCHOR') {
+            return self::TRUST_ANCHOR;
+        }
+
+        if ($role_name === 'NETWORK_MONITOR') {
+            return self::NETWORK_MONITOR;
+        }
+
+        if ($role_name === '') {
+            return self::RESET;
+        }
+
+        throw new RuntimeException('Unexpected value ' . $buffer);
     }
 }

@@ -3,14 +3,8 @@
 
 namespace Siruis\Agent\Listener;
 
-
 use Siruis\Agent\Connections\AgentEvents;
 use Siruis\Agent\Pairwise\AbstractPairwiseList;
-use Siruis\Errors\Exceptions\SiriusConnectionClosed;
-use Siruis\Errors\Exceptions\SiriusCryptoError;
-use Siruis\Errors\Exceptions\SiriusInvalidMessageClass;
-use Siruis\Errors\Exceptions\SiriusInvalidPayloadStructure;
-use Siruis\Errors\Exceptions\SiriusInvalidType;
 use Siruis\Helpers\ArrayHelper;
 use Siruis\Messaging\Message;
 
@@ -25,6 +19,11 @@ class Listener
      */
     public $pairwise_resolver;
 
+    /**
+     * Listener constructor.
+     * @param \Siruis\Agent\Connections\AgentEvents $source
+     * @param \Siruis\Agent\Pairwise\AbstractPairwiseList|null $pairwise_resolver
+     */
     public function __construct(AgentEvents $source, AbstractPairwiseList $pairwise_resolver = null)
     {
         $this->source = $source;
@@ -33,21 +32,23 @@ class Listener
 
     /**
      * @param int|null $timeout
-     * @return Event
-     * @throws SiriusConnectionClosed
-     * @throws SiriusCryptoError
-     * @throws SiriusInvalidMessageClass
-     * @throws SiriusInvalidPayloadStructure
-     * @throws SiriusInvalidType
+     * @return \Siruis\Agent\Listener\Event
+     * @throws \JsonException
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusContextError
+     * @throws \Siruis\Errors\Exceptions\SiriusCryptoError
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidPayloadStructure
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidType
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
      */
     public function get_one(int $timeout = null): Event
     {
         $eventMessage = $this->source->pull($timeout);
-        $event = json_decode($eventMessage->serialize());
-        if (key_exists('message', $event)) {
-            $restored = Message::restoreMessageInstance($event['message']);
-            $ok = $restored[0];
-            $message = $restored[1];
+        $event = json_decode($eventMessage->serialize(), true, 512, JSON_THROW_ON_ERROR);
+        if (array_key_exists('message', $event)) {
+            [$ok, $message] = Message::restoreMessageInstance($event['message']);
             if ($ok) {
                 $event['message'] = $message;
             } else {

@@ -11,15 +11,29 @@ use Siruis\Encryption\Encryption;
 use Siruis\Errors\Exceptions\SiriusContextError;
 use Siruis\Errors\Exceptions\SiriusValidationError;
 use Siruis\Helpers\ArrayHelper;
-use SodiumException;
 
 class BaseInitLedgerMessage extends SimpleConsensusMessage
 {
-    const NAME = 'initialize';
+    public $NAME = 'initialize';
     public $ledger;
     public $ledger_hash;
     public $signatures;
 
+    /**
+     * BaseInitLedgerMessage constructor.
+     * @param array $payload
+     * @param string|null $ledger_name
+     * @param array|null $genesis
+     * @param string|null $root_hash
+     * @param array|null $participants
+     * @param string|null $id_
+     * @param string|null $version
+     * @param string|null $doc_uri
+     * @throws \JsonException
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidType
+     * @throws \Siruis\Errors\Exceptions\SiriusValidationError
+     */
     public function __construct(array $payload,
                                 string $ledger_name = null,
                                 array $genesis = null,
@@ -53,16 +67,28 @@ class BaseInitLedgerMessage extends SimpleConsensusMessage
 
     public function getSignatures()
     {
-        return ArrayHelper::getValueWithKeyFromArray('signatures', $this->payload);
+        return ArrayHelper::getValueWithKeyFromArray('signatures', $this->payload, []);
+    }
+
+    public function setSignatures($value): void
+    {
+        $this->payload['signatures'] = $value;
+        $this->signatures = $this->getSignatures();
     }
 
     /**
      * @param AbstractCrypto $api
      * @param string $participant
      * @return array
-     * @throws SiriusContextError
-     * @throws SiriusValidationError
-     * @throws SodiumException
+     * @throws \JsonException
+     * @throws \Siruis\Errors\Exceptions\SiriusConnectionClosed
+     * @throws \Siruis\Errors\Exceptions\SiriusContextError
+     * @throws \Siruis\Errors\Exceptions\SiriusFieldTypeError
+     * @throws \Siruis\Errors\Exceptions\SiriusIOError
+     * @throws \Siruis\Errors\Exceptions\SiriusInvalidMessageClass
+     * @throws \Siruis\Errors\Exceptions\SiriusTimeoutIO
+     * @throws \Siruis\Errors\Exceptions\SiriusValidationError
+     * @throws \SodiumException
      */
     public function check_signatures(AbstractCrypto $api, string $participant = 'ALL'): array
     {
@@ -70,31 +96,30 @@ class BaseInitLedgerMessage extends SimpleConsensusMessage
             throw new SiriusContextError('Ledger Hash description is empty');
         }
         $signatures = [];
-        if ($participant == 'ALL') {
-            $signatures = $this->signatures;
+        if ($participant === 'ALL') {
+            $signatures = $this->getSignatures();
         } else {
-            $sigs = [];
-            foreach ($this->signatures as $signature) {
-                if ($signature['participant'] == $participant) {
-                    array_push($sigs, $signature);
+            foreach ($this->getSignatures() as $signature) {
+                if ($signature['participant'] === $participant) {
+                    $signatures[] = $signature;
                 }
             }
         }
         if ($signatures) {
             $response = [];
             foreach ($signatures as $item) {
-                $verified = Utils::verify_signed($api, $item['signature']);
-                if (!$verified[1]) {
+                [$signed_ledger_hash, $is_success] = Utils::verify_signed($api, $item['signature']);
+                if (!$is_success) {
                     throw new SiriusValidationError('Invalid sign for participant '. $item['participant']);
                 }
-                if ($verified[0] != $this->ledger_hash) {
+                if ($signed_ledger_hash !== $this->ledger_hash) {
                     throw new SiriusValidationError('NonConsistent ledger hash for participant ' . $item['participant']);
                 }
-                $response[$item['participant']] = $verified[0];
+                $response[$item['participant']] = $signed_ledger_hash;
             }
             return $response;
-        } else {
-            throw new SiriusContextError('Signatures list is empty');
         }
+
+        throw new SiriusContextError('Signatures list is empty');
     }
 }

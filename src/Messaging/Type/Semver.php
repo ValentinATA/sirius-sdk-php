@@ -13,10 +13,10 @@ class Semver extends Version
 
     /**
      * @param string $version_str
-     * @return Semver
+     * @return \PHLAK\SemVer\Version
      * @throws InvalidVersionException
      */
-    public static function fromString(string $version_str)
+    public static function fromString(string $version_str): Version
     {
 //        preg_match(self::SEMVER_RE, $version_str, $matches);
 //        if ($matches) {
@@ -24,5 +24,30 @@ class Semver extends Version
 //        }
 
         return self::parse($version_str);
+    }
+
+    public function getMajor(): int
+    {
+        return $this->major;
+    }
+
+    public function getMinor(): int
+    {
+        return $this->minor;
+    }
+
+    public function getPatch()
+    {
+        return $this->patch;
+    }
+
+    public function getPreRelease(): ?string
+    {
+        return $this->preRelease;
+    }
+
+    public function getBuild(): ?string
+    {
+        return $this->build;
     }
 }

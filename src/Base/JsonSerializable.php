@@ -8,9 +8,7 @@ interface JsonSerializable
 {
     public function serialize();
 
-    /**
-     * @param array|string $buffer
-     * @return mixed
-     */
     public function deserialize($buffer);
+
+    public static function unserialize($buffer);
 }

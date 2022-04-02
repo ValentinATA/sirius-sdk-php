@@ -55,9 +55,9 @@ abstract class BaseAgentConnection
     }
 
     /**
-     * @param int $value
+     * @param int|null $value
      */
-    public function setTimeout(int $value)
+    public function setTimeout(?int $value)
     {
         if (!$value) {
             $this->timeout = null;
@@ -112,11 +112,13 @@ abstract class BaseAgentConnection
         $msg_type = key_exists('@type', $context->payload) ? $context->payload['@type'] : null;
         if (!$msg_type) {
             throw new RuntimeException('message @type is empty');
-        } elseif ($msg_type != self::MSG_TYPE_CONTEXT) {
-            throw new RuntimeException('message @type is empty');
-        } else {
-            $instance->setup($context);
         }
+
+        if ($msg_type !== self::MSG_TYPE_CONTEXT) {
+            throw new RuntimeException('message @type is empty');
+        }
+
+        $instance->setup($context);
         return $instance;
     }
 }
