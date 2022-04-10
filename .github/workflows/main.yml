@@ -11,7 +11,6 @@ on:
 
 jobs:
   run_php_tests:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
     steps:
@@ -19,7 +18,7 @@ jobs:
 
       - uses: MilesChou/composer-action/7.4/install@master
         with:
-          args: install
+          args: install --ignore-platform-reqs
 
       - uses: MilesChou/composer-action/7.4/install@master
         with:
