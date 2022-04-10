@@ -33,8 +33,8 @@ jobs:
         with:
           php-version: '7.4'
 
-      - name: PHP Runner
-        if: always()
-        run: php vendor/phpunit/phpunit/phpunit ./tests/*
-
+      - run: php vendor/phpunit/phpunit/phpunit ./tests/EncryptionTest.php
+      - run: vendor/phpunit/phpunit/phpunit ./tests/CoprotocolsTest.php
+      - run: vendor/phpunit/phpunit/phpunit ./tests/TestAgent.php
+      - run: vendor/phpunit/phpunit/phpunit ./tests/TestFuturePromise.php
 
