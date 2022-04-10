@@ -34,6 +34,7 @@ jobs:
           php-version: '7.4'
 
       - name: PHP Runner
+        if: always()
         run: php vendor/phpunit/phpunit/phpunit ./tests/*
 
 
