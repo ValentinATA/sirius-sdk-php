@@ -33,8 +33,5 @@ jobs:
         with:
           php-version: '7.4'
 
-      - run: php vendor/phpunit/phpunit/phpunit ./tests/EncryptionTest.php
-      - run: vendor/phpunit/phpunit/phpunit ./tests/CoprotocolsTest.php
-      - run: vendor/phpunit/phpunit/phpunit ./tests/TestAgent.php
-      - run: vendor/phpunit/phpunit/phpunit ./tests/TestFuturePromise.php
+      - run: php vendor/phpunit/phpunit/phpunit ./tests
 
