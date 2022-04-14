@@ -28,7 +28,7 @@ jobs:
         working-directory: ./test_suite
         run: docker-compose up -d
         
-      - run: sleep 60
+      - run: sleep 120
         
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
