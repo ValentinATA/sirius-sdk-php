@@ -33,5 +33,11 @@ jobs:
         with:
           php-version: '7.4'
 
-      - run: php vendor/phpunit/phpunit/phpunit ./tests
+      - run: php vendor/phpunit/phpunit/phpunit ./tests --log-junit test-result.xml
+      
+      - name: Publish Unit Test Results
+        uses: EnricoMi/publish-unit-test-result-action/composite@v1
+        if: always()
+        with:
+          files: tests_result.xml
 
